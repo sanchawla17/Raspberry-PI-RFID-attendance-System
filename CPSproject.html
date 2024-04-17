@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .dropdown {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        label {
+            font-size: 18px;
+            margin-right: 10px;
+            color: #555;
+        }
+        select {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            background-color: #f9f9f9;
+            color: #333;
+            appearance: none;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            background-color: #4CAF50;
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #attendanceDate {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        #attendancePercentage {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        th, td {
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: #fff;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #ddd;
+        }
+        td:first-child {
+            width: 10%;
+        }
+        td:nth-child(2) {
+            width: 40%;
+        }
+        td:nth-child(3),
+        td:nth-child(4) {
+            width: 25%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Attendance System</h1>
+        <div class="dropdown">
+            <label for="selectDate">Select Date:</label>
+            <select id="selectDate"></select>
+            <button onclick="updateAttendance()">Show Attendance</button>
+        </div>
+        <div id="attendanceDate"></div>
+        <div id="attendancePercentage"></div>
+        <table id="attendanceTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Text</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <script>
+        let recordsData; // Store all records data
+
+        fetch('rfid_data.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(text => {
+                recordsData = text.trim().split('\n').map(line => {
+                    const { id, text, timestamp } = JSON.parse(line);
+                    return { id, text: text.trim(), timestamp };
+                });
+
+                const selectDate = document.getElementById('selectDate');
+
+                // Get unique dates from records
+                const uniqueDates = Array.from(new Set(recordsData.map(record => new Date(record.timestamp).toLocaleDateString())));
+
+                // Populate select dropdown with unique dates
+                uniqueDates.forEach(date => {
+                    const option = document.createElement('option');
+                    option.text = date;
+                    option.value = date;
+                    selectDate.add(option);
+                });
+            })
+            .catch(error => console.error('Error fetching attendance data:', error));
+
+        function updateAttendance() {
+            const selectDate = document.getElementById('selectDate');
+            const selectedDate = selectDate.value;
+
+            const filteredRecords = recordsData.filter(record => new Date(record.timestamp).toLocaleDateString() === selectedDate);
+
+            const attendanceDate = document.querySelector('#attendanceDate');
+            const attendancePercentage = document.querySelector('#attendancePercentage');
+            const tableBody = document.querySelector('#attendanceTable tbody');
+
+            const firstRecordDate = selectedDate;
+            attendanceDate.innerText = `Attendance Date: ${firstRecordDate}`;
+
+            let totalStudents = 15; // Limit to a class of 15
+
+            // Create a set to store unique text values for the selected date
+            const uniqueTextValues = new Set();
+            filteredRecords.forEach(record => {
+                uniqueTextValues.add(record.text);
+            });
+
+            tableBody.innerHTML = ''; // Clear table body before updating
+
+            // Populate the table with unique text values for the selected date
+            uniqueTextValues.forEach(textValue => {
+                // Find the first record with the text value
+                const record = filteredRecords.find(record => record.text === textValue);
+                if (record) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${record.id}</td>
+                        <td>${record.text}</td>
+                        <td>${new Date(record.timestamp).toLocaleDateString()}</td>
+                        <td>${new Date(record.timestamp).toLocaleTimeString()}</td>
+                    `;
+                    tableBody.appendChild(row);
+                }
+            });
+
+            // Show the number of attending students out of total students and attendance percentage
+            let presentStudents = uniqueTextValues.size; // Unique text values for the selected date
+            let attendancePercentageValue = (presentStudents / totalStudents) * 100 || 0; // Avoid NaN if totalStudents is 0
+            attendancePercentage.innerText = `Number of People: ${presentStudents} out of ${totalStudents} (${attendancePercentageValue.toFixed(2)}%)`;
+        }
+    </script>
+</body>
+</html>
